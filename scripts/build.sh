@@ -49,7 +49,7 @@ cd "$SOURCE_DIR"
 cp "$CONFIG_FILE" .config
 make olddefconfig
 
-jobs="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc)}"
+jobs="${JOBS:-2}"
 echo "Building pinned Raspberry Pi kernel commit $KERNEL_COMMIT"
 echo "Source: $SOURCE_DIR"
 echo "Parallel jobs: $jobs"
