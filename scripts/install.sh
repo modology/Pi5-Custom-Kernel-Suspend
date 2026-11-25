@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+readonly KERNEL_COMMIT="3eddc9976f7a4c687e1bf578118d0d91c12c69da"
 readonly LOCALVERSION="-pi5suspend"
 readonly PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly SOURCE_DIR="${KERNEL_SOURCE_DIR:-$HOME/src/raspberrypi-linux}"
@@ -24,6 +25,8 @@ for cmd in make depmod mkinitramfs; do
 done
 
 [[ -d "$SOURCE_DIR/.git" ]] || { echo "ERROR: Kernel source tree not found: $SOURCE_DIR" >&2; exit 1; }
+actual_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
+[[ "$actual_commit" == "$KERNEL_COMMIT" ]] || { echo "ERROR: Source commit mismatch: $actual_commit" >&2; exit 1; }
 [[ -f "$IMAGE" ]] || { echo "ERROR: Built kernel Image not found: $IMAGE" >&2; exit 1; }
 [[ -f "$DTB" ]] || { echo "ERROR: Built Pi 5 DTB not found: $DTB" >&2; exit 1; }
 [[ -f "$BOOT_DIR/config.txt" ]] || { echo "ERROR: $BOOT_DIR/config.txt not found. Set BOOT_DIR if needed." >&2; exit 1; }
