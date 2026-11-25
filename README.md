@@ -45,7 +45,7 @@ Clone this project and run:
 ```bash
 git clone https://github.com/modology/Pi5-Custom-Kernel-Suspend.git
 cd Pi5-Custom-Kernel-Suspend
-./scripts/build.sh
+bash scripts/build.sh
 ```
 
 The build script clones the Raspberry Pi kernel into `$HOME/src/raspberrypi-linux`, checks out the pinned commit, applies the committed configuration and builds the kernel.
