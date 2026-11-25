@@ -1,10 +1,37 @@
-# Pi5 Custom Kernel — Suspend-to-RAM
+# Pi 5 Custom Kernel — Suspend-to-RAM
 
-Reproducible build and cautious installation project for the Raspberry Pi 5 custom Linux kernel tested on **TumTum**.
+A reproducible build and cautious installation project for a Raspberry Pi 5 custom Linux kernel with **Suspend-to-RAM** support.
 
-> **Experimental status:** Suspend/resume succeeded in individual tests, including NVMe, Wi-Fi, WayVNC and Jellyfin MPV Shim returning after resume. A repeated three-cycle test caused an unexpected reboot; the cause is unknown. This is not yet production-validated.
+## Project overview
 
-## Pinned test snapshot
+This project is intended for a dedicated, low-power **Jellyfin media centre client**. The Raspberry Pi runs [Jellyfin MPV Shim](https://github.com/jellyfin/jellyfin-mpv-shim) to play media from a Jellyfin server. When playback is finished, the system can enter Suspend-to-RAM to reduce power consumption, then resume when needed.
+
+The aim is to make the Pi a compact media client without leaving the full system running continuously.
+
+## Test hardware
+
+The kernel was built and tested on this Raspberry Pi 5 setup:
+
+| Component | Specification |
+|---|---|
+| Board | Raspberry Pi 5 |
+| Memory | 16 GB RAM |
+| Case | Argon ONE V5 |
+| NVMe expansion | Argon ONE V5 Quad NVMe HAT |
+| Display | Argon ONE V5 OLED |
+| Storage | 4 × 1 TB M.2 NVMe SSDs |
+| Media client | Jellyfin MPV Shim |
+| Intended role | Dedicated Jellyfin media centre client with low-power suspend |
+
+The four NVMe drives provide 4 TB of combined raw capacity before formatting, filesystem overhead or any RAID/redundancy configuration.
+
+## Suspend-to-RAM status
+
+> **Experimental:** Suspend-to-RAM and resume have succeeded in individual tests, including recovery of NVMe storage, Wi-Fi and Jellyfin MPV Shim. A repeated three-cycle test caused an unexpected reboot; the cause has not been established. This project is not production-validated.
+
+The kernel targets deep Suspend-to-RAM (the Linux `mem` sleep state with `deep` selected), including the BCM2712 NVMe PCIe suspend/resume quirk.
+
+## Pinned kernel source snapshot
 
 | Item | Value |
 |---|---|
@@ -12,28 +39,29 @@ Reproducible build and cautious installation project for the Raspberry Pi 5 cust
 | Branch at export | `rpi-6.18.y` |
 | Exact source commit | `3eddc9976f7a4c687e1bf578118d0d91c12c69da` |
 | Reported running kernel | `6.18.65+` |
-| Architecture / board | `aarch64` / Raspberry Pi 5 |
+| Architecture | `aarch64` |
+| Board | Raspberry Pi 5 |
 
-The pinned commit is the exact source HEAD recorded on the test machine. The BCM2712 NVMe simple-suspend quirk is present in that tree; the pinned HEAD itself is a later DRM commit, not the NVMe fix commit.
+The pinned commit is the exact source HEAD used for the tested kernel. The BCM2712 NVMe simple-suspend quirk is present in that source tree; the pinned HEAD itself is a later DRM commit, not the NVMe fix commit.
 
-## Files
+## Repository files
 
-- `config/bcm2712_tumtum.config` — captured kernel configuration.
-- `scripts/build.sh` — fetches the pinned source and builds Image, modules and DTBs.
-- `scripts/install.sh` — installs a kernel built from source; does not change boot selection.
+- `config/` — captured kernel configuration.
+- `scripts/build.sh` — fetches the pinned source and builds Image, modules and device trees.
+- `scripts/install.sh` — installs a kernel built from source without changing boot selection.
 - `scripts/package-tested.sh` — packages the currently running kernel and matching boot files.
 - `scripts/install-prebuilt.sh` — verifies and installs a prebuilt release.
-- `scripts/activate.sh` — backs up config.txt and changes only the existing `[pi5]` section.
-- `scripts/rollback.sh` — restores the saved config.txt.
-- `docs/TESTING.md` — test observations and limitations.
+- `scripts/activate.sh` — backs up `config.txt` and changes only the existing `[pi5]` section.
+- `scripts/rollback.sh` — restores the saved `config.txt`.
+- `docs/TESTING.md` — test observations and known limitations.
 
-Config SHA-256: `396c4e41854080b0cc37fba54c2ced3aa20e3b0c136593cfad092e0110a42792`.
+Kernel configuration SHA-256: `396c4e41854080b0cc37fba54c2ced3aa20e3b0c136593cfad092e0110a42792`.
 
 ## Fresh Raspberry Pi OS setup (prebuilt package recommended)
 
 Download `pi5-custom-kernel-6.18.65-plus-arm64.tar.gz` and its `.sha256` sidecar from GitHub Releases into `~/Downloads`.
 
-Clone the repository and install the package:
+Clone this repository and install the package:
 
 ```bash
 git clone https://github.com/modology/Pi5-Custom-Kernel-Suspend.git
@@ -58,8 +86,7 @@ sudo reboot
 
 ### Optional: build from source
 
-The source-build workflow below remains available if you prefer to compile the kernel yourself.
-
+The source-build workflow remains available if you prefer to compile the kernel yourself.
 
 Install dependencies:
 
@@ -113,13 +140,13 @@ Rollback restores boot selection only; it leaves custom kernel files and modules
 - Build, install and activation are separate steps.
 - Keep an offline recovery path before activating.
 - The installer assumes the boot partition is mounted at `/boot/firmware`; set `BOOT_DIR=/path` if needed.
-- The install script assumes the default build directory `~/src/raspberrypi-linux` for the invoking user. Set `KERNEL_SOURCE_DIR=/path/to/source` if you built elsewhere, e.g. `sudo KERNEL_SOURCE_DIR=/home/admin/src/raspberrypi-linux bash scripts/install.sh`.
-- Do not stress-test suspend while undervoltage or throttling is present. The recorded `vcgencmd get_throttled` value was `0x50005`; power stability remains unresolved.
+- The install script assumes the default build directory `~/src/raspberrypi-linux` for the invoking user. Set `KERNEL_SOURCE_DIR=/path/to/source` if you built elsewhere, e.g. `sudo KERNEL_SOURCE_DIR=/home/pi/src/raspberrypi-linux bash scripts/install.sh`.
+- Do not stress-test suspend while undervoltage or throttling is present. The recorded `vcgencmd get_throttled` value was `0x50005`; power stability remains an unresolved test variable.
 - No claim is made that every peripheral resumes reliably.
 
 ## Updating the kernel
 
-Do not silently move the source pin. Test a specific upstream commit, record the kernel release and config changes, run the suspend test plan, then update the pin and docs in a separate commit.
+Do not silently move the source pin. Test a specific upstream commit, record the kernel release and configuration changes, run the suspend test plan, then update the pin and documentation in a separate commit.
 
 ## License
 
