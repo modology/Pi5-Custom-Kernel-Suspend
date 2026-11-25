@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 readonly KERNEL_COMMIT="3eddc9976f7a4c687e1bf578118d0d91c12c69da"
 readonly LOCALVERSION="-pi5suspend"
+readonly PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly BOOT_DIR="${BOOT_DIR:-/boot/firmware}"
 readonly BUILD_USER="${SUDO_USER:-$USER}"
 readonly BUILD_HOME="$(getent passwd "$BUILD_USER" | cut -d: -f6)"
@@ -17,7 +18,7 @@ if [[ "$EUID" -ne 0 ]]; then
 fi
 [[ -n "$BUILD_HOME" && -d "$BUILD_HOME" ]] || { echo "ERROR: Cannot determine build user's home directory ($BUILD_USER)." >&2; exit 1; }
 
-for cmd in git make depmod mkinitramfs getent; do
+for cmd in git make depmod mkinitramfs getent mountpoint; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: Required command not found: $cmd" >&2; exit 1; }
 done
 
@@ -27,6 +28,7 @@ actual_commit="$(git -C "$SOURCE_DIR" rev-parse HEAD)"
 [[ -f "$IMAGE" ]] || { echo "ERROR: Built kernel Image not found: $IMAGE" >&2; exit 1; }
 [[ -f "$DTB" ]] || { echo "ERROR: Built Pi 5 DTB not found: $DTB" >&2; exit 1; }
 [[ -f "$BOOT_DIR/config.txt" ]] || { echo "ERROR: $BOOT_DIR/config.txt not found." >&2; exit 1; }
+mountpoint -q "$BOOT_DIR" || { echo "ERROR: $BOOT_DIR is not a mounted filesystem; refusing to write boot files." >&2; exit 1; }
 [[ -d /lib/modules ]] || { echo "ERROR: /lib/modules not found." >&2; exit 1; }
 [[ ! -e "$MANIFEST" ]] || { echo "ERROR: $MANIFEST already exists. Inspect previous installation first." >&2; exit 1; }
 
@@ -78,4 +80,4 @@ echo "Initramfs: $BOOT_DIR/$initramfs_name"
 echo "Manifest:  $MANIFEST"
 echo
 echo "After reviewing the files, activate with:"
-echo "  sudo bash $BUILD_HOME/Pi5-Custom-Kernel-Suspend/scripts/activate.sh"
+echo "  sudo bash $PROJECT_DIR/scripts/activate.sh"
