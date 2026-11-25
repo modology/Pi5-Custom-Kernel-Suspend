@@ -1,50 +1,76 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly BOOT_DIR="${BOOT_DIR:-/boot/firmware}"
 readonly CONFIG="$BOOT_DIR/config.txt"
 readonly BACKUP="$BOOT_DIR/config.txt.pi5-custom-backup"
-readonly BEGIN="# BEGIN Pi5-Custom-Kernel-Suspend"
-readonly END="# END Pi5-Custom-Kernel-Suspend"
+readonly MANIFEST="$BOOT_DIR/pi5-custom-kernel-install.conf"
 
 if [[ "$EUID" -ne 0 ]]; then
-  echo "Run this script with sudo: sudo bash scripts/activate.sh" >&2
+  echo "Run as root: sudo bash scripts/activate.sh" >&2
   exit 1
 fi
-
 [[ -f "$CONFIG" ]] || { echo "ERROR: $CONFIG not found." >&2; exit 1; }
+[[ -f "$MANIFEST" ]] || { echo "ERROR: Install manifest not found. Run install.sh first." >&2; exit 1; }
+[[ ! -e "$BACKUP" ]] || { echo "ERROR: Backup already exists: $BACKUP. Inspect it; refusing to overwrite." >&2; exit 1; }
 
-for file in kernel_2712-custom.img bcm2712-rpi-5-b-custom.dtb initramfs_2712-custom; do
-  [[ -s "$BOOT_DIR/$file" ]] || { echo "ERROR: Missing boot file: $BOOT_DIR/$file. Run install.sh first." >&2; exit 1; }
+# Generated locally by install.sh.
+# shellcheck disable=SC1090
+source "$MANIFEST"
+
+for file in "$KERNEL_FILE" "$DTB_FILE" "$INITRAMFS_FILE"; do
+  [[ -s "$BOOT_DIR/$file" ]] || { echo "ERROR: Missing or empty boot file: $BOOT_DIR/$file" >&2; exit 1; }
 done
 
-if grep -Fq "$BEGIN" "$CONFIG"; then
-  echo "ERROR: Custom boot configuration is already present. Use rollback.sh first." >&2
-  exit 1
-fi
+pi5_count="$(grep -Ec '^\[pi5\][[:space:]]*$' "$CONFIG" || true)"
+[[ "$pi5_count" -eq 1 ]] || { echo "ERROR: Expected exactly one [pi5] section; found $pi5_count. No changes made." >&2; exit 1; }
 
-if [[ -e "$BACKUP" ]]; then
-  echo "ERROR: Backup already exists: $BACKUP" >&2
-  echo "Preserve it. If this is a previous installation, inspect it before proceeding." >&2
-  exit 1
-fi
+tmp_config="$(mktemp "$BOOT_DIR/.config.txt.XXXXXX")"
+cleanup() { rm -f "$tmp_config"; }
+trap cleanup EXIT
+
+python3 - "$CONFIG" "$tmp_config" "$KERNEL_FILE" "$DTB_FILE" "$INITRAMFS_FILE" <<'PY'
+import pathlib
+import re
+import sys
+
+source, target, kernel, dtb, initramfs = sys.argv[1:]
+lines = pathlib.Path(source).read_text().splitlines()
+out = []
+in_pi5 = False
+inserted = False
+
+for line in lines:
+    section = re.match(r'^\s*\[([^]]+)\]\s*$', line)
+    if section:
+        if in_pi5 and not inserted:
+            out.extend([f"kernel={kernel}", f"device_tree={dtb}",
+                        f"initramfs {initramfs} followkernel"])
+            inserted = True
+        in_pi5 = section.group(1).strip().lower() == "pi5"
+        out.append(line)
+        continue
+
+    if in_pi5 and re.match(r'^\s*(kernel\s*=|device_tree\s*=|initramfs\s+)', line, re.I):
+        continue
+    out.append(line)
+
+if in_pi5 and not inserted:
+    out.extend([f"kernel={kernel}", f"device_tree={dtb}",
+                f"initramfs {initramfs} followkernel"])
+    inserted = True
+
+if not inserted:
+    raise SystemExit("Could not safely locate [pi5] section; config not changed.")
+
+pathlib.Path(target).write_text("\n".join(out) + "\n")
+PY
 
 cp -p "$CONFIG" "$BACKUP"
-
-cat >> "$CONFIG" <<'EOF'
-
-# BEGIN Pi5-Custom-Kernel-Suspend
-[all]
-kernel=kernel_2712-custom.img
-device_tree=bcm2712-rpi-5-b-custom.dtb
-initramfs initramfs_2712-custom followkernel
-# END Pi5-Custom-Kernel-Suspend
-EOF
-
+install -m "$(stat -c '%a' "$CONFIG")" "$tmp_config" "$CONFIG"
 sync
-echo "Custom kernel selected for the next boot."
+
+echo "Custom kernel selected in the existing [pi5] section."
 echo "Original config backup: $BACKUP"
 echo "Reboot when ready: sudo reboot"
-echo "If it fails to boot, mount the boot partition on another computer and"
-echo "replace config.txt with config.txt.pi5-custom-backup."
+echo "If the Pi does not boot, restore config.txt from the backup using another computer."
