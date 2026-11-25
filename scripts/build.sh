@@ -3,13 +3,13 @@ set -Eeuo pipefail
 
 readonly KERNEL_REPO="https://github.com/raspberrypi/linux.git"
 readonly KERNEL_COMMIT="3eddc9976f7a4c687e1bf578118d0d91c12c69da"
+readonly LOCALVERSION="-pi5suspend"
 readonly PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly CONFIG_FILE="$PROJECT_DIR/config/bcm2712_tumtum.config"
 readonly SOURCE_DIR="${KERNEL_SOURCE_DIR:-$HOME/src/raspberrypi-linux}"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "ERROR: Kernel config not found: $CONFIG_FILE" >&2
-  echo "Restore config/bcm2712_tumtum.config from the original kernel export." >&2
   exit 1
 fi
 
@@ -47,19 +47,22 @@ fi
 
 cd "$SOURCE_DIR"
 cp "$CONFIG_FILE" .config
-make olddefconfig
+make LOCALVERSION="$LOCALVERSION" olddefconfig
 
 jobs="${JOBS:-2}"
+release="$(make -s LOCALVERSION="$LOCALVERSION" kernelrelease)"
 echo "Building pinned Raspberry Pi kernel commit $KERNEL_COMMIT"
+echo "Kernel release: $release"
 echo "Source: $SOURCE_DIR"
 echo "Parallel jobs: $jobs"
 
-make -j"$jobs" Image modules dtbs
+make -j"$jobs" LOCALVERSION="$LOCALVERSION" Image modules dtbs
 
 echo
 echo "Build complete."
-echo "Kernel release: $(make -s kernelrelease)"
+echo "Kernel release: $release"
 echo "Image: $SOURCE_DIR/arch/arm64/boot/Image"
 echo "DTB:   $SOURCE_DIR/arch/arm64/boot/dts/broadcom/bcm2712-rpi-5-b.dtb"
 echo
-echo "Nothing has been installed. Review the artifacts and use a separately verified install procedure."
+echo "Nothing has been installed. Review the artifacts, then run:"
+echo "  sudo bash $PROJECT_DIR/scripts/install.sh"
