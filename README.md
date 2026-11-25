@@ -20,14 +20,46 @@ The pinned commit is the exact source HEAD recorded on the test machine. The BCM
 
 - `config/bcm2712_tumtum.config` — captured kernel configuration.
 - `scripts/build.sh` — fetches the pinned source and builds Image, modules and DTBs.
-- `scripts/install.sh` — installs modules and versioned boot files plus a matching initramfs; does not change boot selection.
+- `scripts/install.sh` — installs a kernel built from source; does not change boot selection.
+- `scripts/package-tested.sh` — packages the currently running kernel and matching boot files.
+- `scripts/install-prebuilt.sh` — verifies and installs a prebuilt release.
 - `scripts/activate.sh` — backs up config.txt and changes only the existing `[pi5]` section.
 - `scripts/rollback.sh` — restores the saved config.txt.
 - `docs/TESTING.md` — test observations and limitations.
 
 Config SHA-256: `396c4e41854080b0cc37fba54c2ced3aa20e3b0c136593cfad092e0110a42792`.
 
-## Fresh Raspberry Pi OS setup
+## Fresh Raspberry Pi OS setup (prebuilt package recommended)
+
+Download `pi5-custom-kernel-6.18.65-plus-arm64.tar.gz` and its `.sha256` sidecar from GitHub Releases into `~/Downloads`.
+
+Clone the repository and install the package:
+
+```bash
+git clone https://github.com/modology/Pi5-Custom-Kernel-Suspend.git
+cd Pi5-Custom-Kernel-Suspend
+sudo bash scripts/install-prebuilt.sh ~/Downloads/pi5-custom-kernel-6.18.65-plus-arm64.tar.gz
+```
+
+Review the installed files before activation:
+
+```bash
+cat /boot/firmware/pi5-custom-kernel-install.conf
+ls -lh /boot/firmware/kernel_2712-custom.img /boot/firmware/bcm2712-rpi-5-b-custom.dtb /boot/firmware/initramfs_2712-custom
+ls -ld /lib/modules/6.18.65+
+```
+
+Activate only when ready:
+
+```bash
+sudo bash scripts/activate.sh
+sudo reboot
+```
+
+### Optional: build from source
+
+The source-build workflow below remains available if you prefer to compile the kernel yourself.
+
 
 Install dependencies:
 
